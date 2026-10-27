@@ -1,0 +1,49 @@
+/* Estilo del historial de portapapeles: negro + blanco, como el launcher. */
+* {
+    font-family: "SF Pro Text";
+    font-size: 14px;
+}
+
+window {
+    background-color: rgba(0, 0, 0, 0.92);
+    border: 1px solid #ffffff;
+    border-radius: 12px;
+}
+
+#outer-box {
+    background: transparent;
+    padding: 6px;
+}
+
+#input {
+    margin: 8px;
+    padding: 9px 12px;
+    background-color: transparent;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+}
+
+#input:focus {
+    border-color: #ffffff;
+}
+
+#scroll {
+    margin: 4px;
+    background: transparent;
+}
+
+#inner-box {
+    background: transparent;
+}
+
+#entry {
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: #d0d0d0;
+}
+
+#entry:selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}

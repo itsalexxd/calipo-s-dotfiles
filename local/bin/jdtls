@@ -1,0 +1,5 @@
+#!/bin/sh
+# jdtls instalado manualmente: Mason falla al descargar lombok desde
+# projectlombok.org, así que el servidor vive en el directorio share de Mason
+# y este wrapper lo pone en el PATH para que LazyVim lo encuentre.
+exec python3 "$HOME/.local/share/nvim/mason/share/jdtls/bin/jdtls" "$@"

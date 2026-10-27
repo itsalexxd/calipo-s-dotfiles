@@ -1,3 +1,4 @@
+# Color dinamico
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -7,10 +8,64 @@ import QtQuick.Controls.Basic
 import Quickshell.Bluetooth
 
 ShellRoot {
+    id: root
     
     // ==========================================
+    // 0. GESTOR DE COLORES (PYWAL)
+    // ==========================================
+    Item {
+        id: theme
+        // Colores por defecto (Catppuccin) que se usarán un instante hasta que cargue Pywal
+        property color bg: "#2c2c34"
+        property color bg_light: "#45475a"
+        property color fg: "#ffffff"
+        property color fg_dim: "#cdd6f4"
+        property color accent: "#1747a9"
+        property color success: "#a6e3a1"
+        property color error: "#f38ba8"
+
+        // Función auxiliar para aplicar transparencia a los colores dinámicos
+        function alpha(colorString, a) {
+            let c = Qt.color(colorString);
+            return Qt.rgba(c.r, c.g, c.b, a);
+        }
+    }
+
+    // Lee la caché de colores generada por Pywal
+    Process {
+        id: pywalLoader
+        command: ["sh", "-c", "cat ~/.cache/wal/colors.json 2>/dev/null | tr -d '\n'"]
+        running: true // Se autoejecuta al iniciar la barra
+        stdout: SplitParser {
+            onRead: data => {
+                if (data === "") return;
+                try {
+                    let j = JSON.parse(data);
+                    theme.bg = j.special.background;
+                    theme.fg = j.special.foreground;
+                    theme.bg_light = j.colors.color8;
+                    theme.fg_dim = j.colors.color7;
+                    theme.accent = j.colors.color4;
+                    theme.success = j.colors.color2;
+                    theme.error = j.colors.color1;
+                } catch(e) {
+                    console.log("Error parseando colores de Pywal: " + e)
+                }
+            }
+        }
+    }
+
+    // Escucha la señal desde el selector de fondos de pantalla
+    IpcHandler {
+        target: "main-bar"
+        function reloadColors(): void {
+            pywalLoader.running = true;
+        }
+    }
+
+    // ==========================================
     // 1. BARRA PRINCIPAL
-    // ==========================================S
+    // ==========================================
     PanelWindow {
         id: mainBar
         anchors { top: true; left: true; right: true }
@@ -32,10 +87,8 @@ ShellRoot {
                 anchors.verticalCenter: parent.verticalCenter
 
                 property var powerActions: [
-                    { label: "Bloquear",      icon: "󰌾", command: ["hyprlock"] },
-                    { label: "Cerrar sesión", icon: "󰍃", command: ["hyprctl", "dispatch", "exit"] },
+                    { label: "Bloquear",      icon: "󰌾", command: ["sh", "-c", "qs -p /home/alexg/.config/quickshell/lock/shell.qml -d -n; sleep 0.3; qs ipc -p /home/alexg/.config/quickshell/lock/shell.qml call lock lock"] },
                     { label: "Suspender",     icon: "󰤄", command: ["systemctl", "suspend"] },
-                    { label: "Hibernar",      icon: "󰋊", command: ["systemctl", "hibernate"] },
                     { label: "Reiniciar",     icon: "󰜉", command: ["systemctl", "reboot"] },
                     { label: "Apagar",        icon: "⏻", command: ["systemctl", "poweroff"] }
                 ]
@@ -53,7 +106,7 @@ ShellRoot {
                 Text {
                     anchors.centerIn: parent
                     text: "󰣇"
-                    color: powerMouseArea.containsMouse ? "#ffffff" : "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 18
                     font.family: "JetBrainsMono Nerd Font"
                     font.bold: true
@@ -74,6 +127,7 @@ ShellRoot {
                 PopupWindow {
                     id: powerPopup
                     visible: false
+                    color: "transparent"
                     implicitWidth: 170
                     implicitHeight: powerColumn.implicitHeight + 16
 
@@ -88,8 +142,8 @@ ShellRoot {
                     Rectangle {
                         anchors.fill: parent
                         radius: 10
-                        color: "#2c2c34"
-                        border.color: "#45475a"
+                        color: theme.bg
+                        border.color: theme.bg_light
                         border.width: 1
 
                         Column {
@@ -105,7 +159,7 @@ ShellRoot {
                                     width: powerColumn.width
                                     height: 28
                                     radius: 6
-                                    color: btnMouse.containsMouse ? "#45475a" : "transparent"
+                                    color: btnMouse.containsMouse ? theme.alpha(theme.bg_light, 0.5) : "transparent"
                                     Behavior on color { ColorAnimation { duration: 100 } }
 
                                     Row {
@@ -116,14 +170,14 @@ ShellRoot {
 
                                         Text {
                                             text: modelData.icon
-                                            color: "#ffffff"
+                                            color: theme.fg
                                             font.family: "JetBrainsMono Nerd Font"
                                             font.pixelSize: 14
                                             anchors.verticalCenter: parent.verticalCenter
                                         }
                                         Text {
                                             text: modelData.label
-                                            color: "#cdd6f4"
+                                            color: theme.fg_dim
                                             font.pixelSize: 13
                                             anchors.verticalCenter: parent.verticalCenter
                                         }
@@ -149,7 +203,7 @@ ShellRoot {
                 }
             }
 
-            // --- 2. Workspaces (1-5 fijos, del 6 en adelante dinámicos) ---
+            // --- 2. Workspaces ---
             Item {
                 id: workspacesModule
                 width: {
@@ -186,14 +240,14 @@ ShellRoot {
                         width: 32
                         height: 20
                         radius: 0
-                        color: isActive ? "#4dffffff" : "#22ffffff"
+                        color: isActive ? theme.alpha(theme.fg, 0.3) : theme.alpha(theme.fg, 0.13)
 
                         Behavior on color { ColorAnimation { duration: 200 } }
 
                         Text {
                             anchors.centerIn: parent
                             text: workspacesModule.toKanji(wsNum)
-                            color: isActive ? '#ffffff' : "#cdd6f4"
+                            color: isActive ? theme.fg : theme.fg_dim
                             font.pixelSize: 14
                             font.bold: true
                             font.family: "Noto Sans CJK JP"
@@ -237,7 +291,7 @@ ShellRoot {
                                 return indexOffset * 38;
                             }
                             z: modelData.active ? 100 : wsNum
-                            color: modelData.active ? "#4dffffff" : "#22ffffff"
+                            color: modelData.active ? theme.alpha(theme.fg, 0.3) : theme.alpha(theme.fg, 0.13)
 
                             Behavior on color { ColorAnimation { duration: 200 } }
                             Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutExpo } }
@@ -245,7 +299,7 @@ ShellRoot {
                             Text {
                                 anchors.centerIn: parent
                                 text: workspacesModule.toKanji(wsNum)
-                                color: modelData.active ? '#ffffff' : "#cdd6f4"
+                                color: modelData.active ? theme.fg : theme.fg_dim
                                 font.bold: true
                                 font.family: "Noto Sans CJK JP"
                             }
@@ -260,7 +314,7 @@ ShellRoot {
                 }
             }
 
-            // --- 3. Módulo de Aplicaciones Activas (Filtrado por jq) ---
+            // --- 3. Módulo de Aplicaciones Activas ---
             Item {
                 id: clientListModule
                 height: 20
@@ -271,19 +325,14 @@ ShellRoot {
 
                 Process {
                     id: clientsProc
-                    // Filtramos directamente con jq usando el nombre del workspace actual
                     command: ["sh", "-c", "hyprctl clients -j | jq -c --arg ws \"" + (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.name : "1") + "\" '[.[] | select(.workspace.name == $ws)]'"]
                     running: true
                     stdout: SplitParser {
                         onRead: data => {
                             try {
                                 let json = JSON.parse(data.trim());
-                                if (Array.isArray(json)) {
-                                    clientListModule.currentClients = json;
-                                }
-                            } catch(e) {
-                                clientListModule.currentClients = [];
-                            }
+                                if (Array.isArray(json)) clientListModule.currentClients = json;
+                            } catch(e) { clientListModule.currentClients = []; }
                         }
                     }
                 }
@@ -292,9 +341,7 @@ ShellRoot {
                     interval: 300
                     running: true
                     repeat: true
-                    onTriggered: {
-                        if (!clientsProc.running) clientsProc.running = true;
-                    }
+                    onTriggered: { if (!clientsProc.running) clientsProc.running = true; }
                 }
 
                 Row {
@@ -308,9 +355,9 @@ ShellRoot {
                         delegate: Rectangle {
                             width: 24
                             height: 20
-                            radius: 0
-                            color: clientMouse.containsMouse ? "#45475a" : "#2c2c34"
-                            border.color: modelData.focused ? "#1747a9" : "#45475a"
+                            radius: 4
+                            color: clientMouse.containsMouse ? theme.bg_light : theme.bg
+                            border.color: modelData.focused ? theme.accent : theme.bg_light
                             border.width: 1
 
                             Behavior on color { ColorAnimation { duration: 100 } }
@@ -319,16 +366,23 @@ ShellRoot {
                                 anchors.centerIn: parent
                                 text: {
                                     let cls = modelData.class ? modelData.class.toLowerCase() : "";
-                                    if (cls.includes("firefox") || cls.includes("brave") || cls.includes("google-chrome")) return "󰈹";
-                                    if (cls.includes("code") || cls.includes("vscode")) return "󰨞";
-                                    if (cls.includes("terminal") || cls.includes("kitty") || cls.includes("alacritty") || cls.includes("foot")) return "󰆍";
-                                    if (cls.includes("discord")) return "󰙯";
+                                    if (cls.includes("brave")) return "";
+                                    if (cls.includes("code")) return "󰨞";
+                                    if (cls.includes("kitty") || cls.includes("alacritty")) return "󰆍";
+                                    if (cls.includes("discord")) return "";
                                     if (cls.includes("spotify")) return "󰓇";
-                                    if (cls.includes("whatsapp") || cls.includes("zen")) return "󰖣";
+                                    if (cls.includes("whatsapp web")) return "󰖣";
+                                    if (cls.includes("obsidian")) return "";
+                                    if (cls.includes("eclipse")) return "";
+                                    if (cls.includes("yazi") || cls.includes("thunar")) return "";
+                                    if (cls.includes("steam")) return "";
+                                    if (cls.includes("modrinth")) return "󰍳";
+                                    if (cls.includes("writer")) return "";
+                                    if (cls.includes("calc")) return "󱎏";
                                     return "󰣆";
                                 }
-                                color: modelData.focused ? "#ffffff" : "#cdd6f4"
-                                font.pixelSize: 12
+                                color: modelData.focused ? theme.fg : theme.fg_dim
+                                font.pixelSize: 14
                                 font.family: "JetBrainsMono Nerd Font"
                             }
 
@@ -337,9 +391,7 @@ ShellRoot {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    Quickshell.execDetached(["hyprctl", "dispatch", "focuswindow", "address:" + modelData.address]);
-                                }
+                                onClicked: Quickshell.execDetached(["hyprctl", "dispatch", "focuswindow", "address:" + modelData.address]);
                             }
                         }
                     }
@@ -351,11 +403,10 @@ ShellRoot {
         // --- CENTRO: RELOJ Y CLIMA ---
         Row {
             anchors.centerIn: parent
-            spacing: 15 // Espacio entre el reloj y el clima
+            spacing: 15 
 
-            // Reloj (Tu codigo original adaptado al Row)
             Text {
-                color: "#ffffff"
+                color: theme.fg
                 font.pixelSize: 15
                 font.bold: true
                 anchors.verticalCenter: parent.verticalCenter
@@ -364,16 +415,15 @@ ShellRoot {
                 Timer { interval: 1000; running: true; repeat: true; onTriggered: parent.updateTime() }
             }
 
-            // Clima (Actualiza con la IP)
             Row {
-                id: weatherModule // ID para referenciar las funciones desde dentro
+                id: weatherModule
                 spacing: 5
                 anchors.verticalCenter: parent.verticalCenter
                 
                 Text {
                     id: weatherIcon
-                    text: "" // Icono por defecto al cargar
-                    color: "#ffffff"
+                    text: "" 
+                    color: theme.fg
                     font.pixelSize: 15
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -381,7 +431,7 @@ ShellRoot {
                 Text {
                     id: weatherText
                     text: "..."
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 15
                     font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
@@ -389,28 +439,22 @@ ShellRoot {
 
                 function updateWeather() {
                     var req = new XMLHttpRequest();
-                    // %C = Condicion textual (ej. Clear, Rain), %t = Temperatura
-                    // Usamos "|" para separar ambos valores y procesarlos facil
                     req.open("GET", "http://wttr.in/?format=%C|%t");
                     req.setRequestHeader("User-Agent", "curl/7.81.0");
                     
                     req.onreadystatechange = function() {
-                        if (req.readyState === XMLHttpRequest.DONE) {
-                            if (req.status === 200) {
-                                var parts = req.responseText.trim().split("|");
-                                if (parts.length >= 2) {
-                                    var condition = parts[0].toLowerCase();
-                                    // Quitamos el signo "+" de la temperatura si lo trae por estetica
-                                    weatherText.text = parts[1].replace("+", ""); 
-                                    
-                                    // Cambiamos el icono segun el texto de la condicion
-                                    if (condition.indexOf("clear") !== -1 || condition.indexOf("sunny") !== -1) weatherIcon.text = ""; // Sol
-                                    else if (condition.indexOf("rain") !== -1 || condition.indexOf("drizzle") !== -1 || condition.indexOf("shower") !== -1) weatherIcon.text = ""; // Lluvia
-                                    else if (condition.indexOf("snow") !== -1 || condition.indexOf("ice") !== -1) weatherIcon.text = ""; // Nieve
-                                    else if (condition.indexOf("thunder") !== -1 || condition.indexOf("storm") !== -1) weatherIcon.text = ""; // Tormenta
-                                    else if (condition.indexOf("fog") !== -1 || condition.indexOf("mist") !== -1) weatherIcon.text = ""; // Niebla
-                                    else weatherIcon.text = ""; // Nublado o generico
-                                }
+                        if (req.readyState === XMLHttpRequest.DONE && req.status === 200) {
+                            var parts = req.responseText.trim().split("|");
+                            if (parts.length >= 2) {
+                                var condition = parts[0].toLowerCase();
+                                weatherText.text = parts[1].replace("+", ""); 
+                                
+                                if (condition.indexOf("clear") !== -1 || condition.indexOf("sunny") !== -1) weatherIcon.text = ""; 
+                                else if (condition.indexOf("rain") !== -1 || condition.indexOf("drizzle") !== -1 || condition.indexOf("shower") !== -1) weatherIcon.text = ""; 
+                                else if (condition.indexOf("snow") !== -1 || condition.indexOf("ice") !== -1) weatherIcon.text = ""; 
+                                else if (condition.indexOf("thunder") !== -1 || condition.indexOf("storm") !== -1) weatherIcon.text = ""; 
+                                else if (condition.indexOf("fog") !== -1 || condition.indexOf("mist") !== -1) weatherIcon.text = ""; 
+                                else weatherIcon.text = ""; 
                             }
                         }
                     }
@@ -420,7 +464,7 @@ ShellRoot {
                 Component.onCompleted: weatherModule.updateWeather()
 
                 Timer {
-                    interval: 1800000 // Actualiza cada 30 min
+                    interval: 1800000
                     running: true
                     repeat: true
                     onTriggered: weatherModule.updateWeather()
@@ -433,10 +477,9 @@ ShellRoot {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: 10
-            spacing: 15 // Espacio entre los diferentes modulos
+            spacing: 15
 
-            
-            // --- Modulo de Volumen (PipeWire via wpctl) ---
+            // --- Modulo de Volumen ---
             Item {
                 id: volumeModule
                 width: volumeRow.width
@@ -453,11 +496,8 @@ ShellRoot {
                     else return "󰕾";
                 }
 
-                function refreshVolume() {
-                    getVolumeProcess.running = true;
-                }
+                function refreshVolume() { getVolumeProcess.running = true; }
 
-                // Fija el volumen a un valor absoluto (usado por el slider)
                 function setVolumeAbsolute(pct) {
                     pct = Math.max(0, Math.min(100, Math.round(pct)));
                     volumeModule.volume = pct;
@@ -466,7 +506,6 @@ ShellRoot {
                     setVolumeProcess.running = true;
                 }
 
-                // Sube/baja el volumen relativamente (usado por la rueda del raton)
                 function adjustVolume(deltaPct) {
                     var dir = deltaPct > 0 ? "+" : "-";
                     var step = Math.abs(deltaPct);
@@ -482,7 +521,7 @@ ShellRoot {
 
                     Text {
                         text: volumeModule.volumeIcon()
-                        color: "#ffffff"
+                        color: theme.fg
                         font.pixelSize: 18
                         font.family: "JetBrainsMono Nerd Font"
                         font.bold: true
@@ -490,7 +529,7 @@ ShellRoot {
                     }
                     Text {
                         text: volumeModule.muted ? "" : volumeModule.volume + "%"
-                        color: "#ffffff"
+                        color: theme.fg
                         font.pixelSize: 15
                         font.bold: true
                         anchors.verticalCenter: parent.verticalCenter
@@ -514,12 +553,10 @@ ShellRoot {
                     }
                 }
 
-                // Lee el volumen actual desde PipeWire
                 Process {
                     id: getVolumeProcess
                     command: ["sh", "-c", "wpctl get-volume @DEFAULT_AUDIO_SINK@"]
                     running: false
-
                     stdout: SplitParser {
                         onRead: data => {
                             let line = data.trim();
@@ -533,14 +570,12 @@ ShellRoot {
                     }
                 }
 
-                // Ejecuta los cambios de volumen (set-volume)
                 Process {
                     id: setVolumeProcess
                     running: false
                     onRunningChanged: if (!running) volumeModule.refreshVolume()
                 }
 
-                // Refresco periodico por si el volumen cambia desde fuera (teclas, otra app, etc.)
                 Timer {
                     interval: 100
                     running: true
@@ -550,10 +585,10 @@ ShellRoot {
 
                 Component.onCompleted: volumeModule.refreshVolume()
 
-                // --- Popup con el slider ---
                 PopupWindow {
                     id: volumePopup
                     visible: false
+                    color: "transparent"
                     implicitWidth: 200
                     implicitHeight: 56
 
@@ -562,15 +597,15 @@ ShellRoot {
                         edges: Edges.Bottom
                         gravity: Edges.Bottom
                         adjustment: PopupAdjustment.None
-                        margins.bottom: -8                  // Distancia con la barra superior, asi coincide con mi ventana
+                        margins.bottom: -8
                     }
 
                     Rectangle {
                         anchors.fill: parent
                         radius: 0
-                        color: "#2c2c3456"
-                        border.color: "#45475a"
-                        border.width: 0.5
+                        color: theme.alpha(theme.bg, 0.6)
+                        border.color: theme.alpha(theme.fg, 0.2)
+                        border.width: 1
 
                         Slider {
                             id: volumeSlider
@@ -587,13 +622,13 @@ ShellRoot {
                                 width: volumeSlider.availableWidth
                                 height: 6
                                 radius: 3
-                                color: "#45475a"
+                                color: theme.alpha(theme.fg, 0.2)
 
                                 Rectangle {
                                     width: volumeSlider.visualPosition * parent.width
                                     height: parent.height
                                     radius: 3
-                                    color: "#1747a9"
+                                    color: theme.accent
                                 }
                             }
 
@@ -603,8 +638,8 @@ ShellRoot {
                                 width: 16
                                 height: 16
                                 radius: 8
-                                color: volumeSlider.pressed ? "#cdd6f4" : "#ffffff"
-                                border.color: "#1747a9"
+                                color: volumeSlider.pressed ? theme.fg_dim : theme.fg
+                                border.color: theme.accent
                                 border.width: 2
                             }
                         }
@@ -635,7 +670,7 @@ ShellRoot {
 
                     Text {
                         text: bluetoothModule.btEnabled ? "󰂯" : "󰂲"
-                        color: bluetoothModule.btEnabled ? "#ffffff" : "#ffffff"
+                        color: theme.fg
                         font.pixelSize: 18
                         font.family: "JetBrainsMono Nerd Font"
                         font.bold: true
@@ -655,6 +690,7 @@ ShellRoot {
                 PopupWindow {
                     id: bluetoothPopup
                     visible: false
+                    color: "transparent"
                     implicitWidth: 240
                     implicitHeight: bluetoothColumn.implicitHeight + 20
 
@@ -669,8 +705,8 @@ ShellRoot {
                     Rectangle {
                         anchors.fill: parent
                         radius: 10
-                        color: "#2c2c34"
-                        border.color: "#45475a"
+                        color: theme.alpha(theme.bg, 0.6)
+                        border.color: theme.alpha(theme.fg, 0.2)
                         border.width: 1
 
                         Column {
@@ -681,14 +717,13 @@ ShellRoot {
                             width: parent.width - 20
                             spacing: 10
 
-                            // --- Cabecera con el switch ---
                             Item {
                                 width: parent.width
                                 height: 24
 
                                 Text {
                                     text: "Bluetooth"
-                                    color: "#cdd6f4"
+                                    color: theme.fg
                                     font.pixelSize: 14
                                     font.bold: true
                                     anchors.left: parent.left
@@ -702,14 +737,14 @@ ShellRoot {
                                     radius: 11
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    color: bluetoothModule.btEnabled ? "#1747a9" : "#45475a"
+                                    color: bluetoothModule.btEnabled ? theme.accent : theme.alpha(theme.fg, 0.2)
                                     Behavior on color { ColorAnimation { duration: 150 } }
 
                                     Rectangle {
                                         width: 18
                                         height: 18
                                         radius: 9
-                                        color: "#ffffff"
+                                        color: theme.fg
                                         anchors.verticalCenter: parent.verticalCenter
                                         x: bluetoothModule.btEnabled ? parent.width - width - 2 : 2
                                         Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutExpo } }
@@ -730,11 +765,10 @@ ShellRoot {
                             Rectangle {
                                 width: parent.width
                                 height: 1
-                                color: "#45475a"
+                                color: theme.alpha(theme.fg, 0.2)
                                 visible: bluetoothModule.btEnabled
                             }
 
-                            // --- Lista de dispositivos (solo si está encendido) ---
                             Column {
                                 width: parent.width
                                 spacing: 4
@@ -742,7 +776,7 @@ ShellRoot {
 
                                 Text {
                                     text: (bluetoothModule.adapter && bluetoothModule.adapter.devices.values.length > 0) ? "Dispositivos" : "Sin dispositivos emparejados"
-                                    color: "#9399b2"
+                                    color: theme.fg_dim
                                     font.pixelSize: 11
                                 }
 
@@ -753,7 +787,7 @@ ShellRoot {
                                         width: parent.width
                                         height: 28
                                         radius: 6
-                                        color: deviceMouse.containsMouse ? "#45475a" : "transparent"
+                                        color: deviceMouse.containsMouse ? theme.alpha(theme.fg, 0.2) : "transparent"
                                         Behavior on color { ColorAnimation { duration: 100 } }
 
                                         Text {
@@ -761,7 +795,7 @@ ShellRoot {
                                             anchors.left: parent.left
                                             anchors.leftMargin: 8
                                             text: (modelData.connected ? "󰂱 " : "󰂯 ") + modelData.name
-                                            color: modelData.connected ? "#a6e3a1" : "#cdd6f4"
+                                            color: modelData.connected ? theme.success : theme.fg
                                             font.pixelSize: 12
                                             font.family: "JetBrainsMono Nerd Font"
                                         }
@@ -787,7 +821,7 @@ ShellRoot {
                 }
             }
 
-            // --- Módulo de Red (SSID + señal WiFi) ---
+            // --- Módulo de Red ---
             Row {
                 id: netModule
                 spacing: 8
@@ -797,17 +831,17 @@ ShellRoot {
                 property string ssidName: "..."
 
                 function updateWifiIcon(signal) {
-                    if (signal > 80) return "󰤨";      // Excelente
-                    else if (signal > 60) return "󰤥"; // Buena
-                    else if (signal > 40) return "󰤢"; // Media
-                    else if (signal > 20) return "󰤟"; // Baja
-                    else if (signal > 0) return "󰤯";  // Muy baja
-                    else return "󰤮";                 // Sin señal
+                    if (signal > 80) return "󰤨";      
+                    else if (signal > 60) return "󰤥"; 
+                    else if (signal > 40) return "󰤢"; 
+                    else if (signal > 20) return "󰤟"; 
+                    else if (signal > 0) return "󰤯";  
+                    else return "󰤮";                 
                 }
 
                 Text {
                     text: netModule.wifiIcon
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 18
                     font.family: "JetBrainsMono Nerd Font"
                     anchors.verticalCenter: parent.verticalCenter
@@ -815,12 +849,11 @@ ShellRoot {
 
                 Text {
                     text: netModule.ssidName
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 15
                     font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
                     elide: Text.ElideRight
-                    // Corta el nombre si es muy largo, para no romper la barra
                     width: Math.min(implicitWidth, 140)
                 }
 
@@ -848,7 +881,7 @@ ShellRoot {
                 }
 
                 Timer {
-                    interval: 3000
+                    interval: 100
                     running: true
                     repeat: true
                     onTriggered: {
@@ -861,13 +894,13 @@ ShellRoot {
                 Component.onCompleted: netProcess.running = true
             }
 
-            // --- Modulo de RAM (Sincronizado con el sistema) ---
+            // --- Modulo de RAM ---
             Row {
                 spacing: 5
                 
                 Text {
-                    text: "󰘚" // Glifo de chip/memoria (Nerd Font)
-                    color: "#ffffff"
+                    text: "" 
+                    color: theme.fg
                     font.pixelSize: 16
                     font.family: "JetBrainsMono Nerd Font"
                     anchors.verticalCenter: parent.verticalCenter
@@ -876,7 +909,7 @@ ShellRoot {
                 Text {
                     id: ramText
                     text: "..." 
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 15
                     font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
@@ -884,40 +917,31 @@ ShellRoot {
 
                 Process {
                     id: ramProcess
-                    // Calcula el porcentaje de RAM usada dividiendo usada / total
                     command: ["sh", "-c", "free | awk '/Mem:/ {print int($3/$2 * 100)}'"]
                     running: false
-
                     stdout: SplitParser {
                         onRead: data => {
                             let val = data.trim();
-                            if (val !== "" && !isNaN(val)) {
-                                ramText.text = val + "%";
-                            }
+                            if (val !== "" && !isNaN(val)) ramText.text = val + "%";
                         }
                     }
                 }
 
-                // El Timer actualiza el valor de la RAM cada 5 segundos
                 Timer {
                     interval: 5000
                     running: true
                     repeat: true
-                    onTriggered: {
-                        if (!ramProcess.running) {
-                            ramProcess.running = true;
-                        }
-                    }
+                    onTriggered: { if (!ramProcess.running) ramProcess.running = true; }
                 }
             }
 
-            // --- Modulo de CPU (Exacto y sincronizado con btop) ---
+            // --- Modulo de CPU ---
             Row {
                 spacing: 5
                 
                 Text {
                     text: "" 
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 16
                     font.family: "JetBrainsMono Nerd Font"
                     anchors.verticalCenter: parent.verticalCenter
@@ -926,7 +950,7 @@ ShellRoot {
                 Text {
                     id: cpuText
                     text: "..." 
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 15
                     font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
@@ -934,94 +958,77 @@ ShellRoot {
 
                 Process {
                     id: cpuProcess
-                    // Toma dos fotos de /proc/stat separadas por 1 segundo, calcula el % real y escupe un único número
                     command: ["sh", "-c", "awk 'NR==1 {u1=$2+$3+$4; t1=$2+$3+$4+$5+$6+$7+$8} NR==2 {u2=$2+$3+$4; t2=$2+$3+$4+$5+$6+$7+$8; print int((u2-u1)*100/(t2-t1))}' <(grep '^cpu ' /proc/stat) <(sleep 1; grep '^cpu ' /proc/stat)"]
                     running: false
-
                     stdout: SplitParser {
                         onRead: data => {
                             let val = data.trim();
-                            if (val !== "" && !isNaN(val)) {
-                                cpuText.text = val + "%";
-                            }
+                            if (val !== "" && !isNaN(val)) cpuText.text = val + "%";
                         }
                     }
                 }
 
-                // El Timer dispara una medición limpia cada 2 segundos
                 Timer {
                     interval: 2000
                     running: true
                     repeat: true
-                    onTriggered: {
-                        if (!cpuProcess.running) {
-                            cpuProcess.running = true;
-                        }
-                    }
+                    onTriggered: { if (!cpuProcess.running) cpuProcess.running = true; }
                 }
             }
 
-            // --- Módulo de Batería estilo macOS ---
+            // --- Módulo de Batería ---
             Row {
                 spacing: 8
                 anchors.verticalCenter: parent.verticalCenter
 
-                // Texto del porcentaje
                 Text {
                     id: batteryText
-                    color: "#ffffff"
+                    color: theme.fg
                     font.pixelSize: 15
                     font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
                     text: Math.round(UPower.displayDevice.percentage * 100) + "%"
                 }
 
-                // Píldora de batería dibujada mediante QML
                 Item {
                     width: 24
                     height: 11
                     anchors.verticalCenter: parent.verticalCenter
 
-                    property real pct: UPower.displayDevice.percentage // Valor entre 0.0 y 1.0
+                    property real pct: UPower.displayDevice.percentage 
                     property bool isCharging: UPower.displayDevice.state === 1 || UPower.displayDevice.state === 4
 
-                    // Contenedor principal (El cuerpo de la batería)
                     Rectangle {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         width: 21
                         height: 11
                         radius: 3.5
-                        color: "#22ffffff" // Fondo translúcido de la batería
-                        border.color: "#cdd6f4"
+                        color: theme.alpha(theme.fg, 0.13)
+                        border.color: theme.fg_dim
                         border.width: 1
 
-                        // Relleno interior proporcional al porcentaje
                         Rectangle {
                             id: fillRect
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
                             anchors.margins: 2
-                            // El ancho se calcula en función del porcentaje real (dejando margen interior)
                             width: Math.max(0, (parent.width - 4) * parent.parent.pct)
                             radius: 2
-                            color: parent.parent.isCharging ? "#a6e3a1" : (parent.parent.pct <= 0.2 ? "#f38ba8" : "#ffffff")
+                            color: parent.parent.isCharging ? theme.success : (parent.parent.pct <= 0.2 ? theme.error : theme.fg)
 
-                            Behavior on width {
-                                NumberAnimation { duration: 200 }
-                            }
+                            Behavior on width { NumberAnimation { duration: 200 } }
                         }
                     }
 
-                    // El "pezón" o terminal positivo de la batería a la derecha
                     Rectangle {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         width: 2
                         height: 5
                         radius: 1
-                        color: "#cdd6f4"
+                        color: theme.fg_dim
                     }
                 }
             }

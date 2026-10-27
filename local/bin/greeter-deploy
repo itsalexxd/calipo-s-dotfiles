@@ -1,0 +1,7 @@
+#!/bin/sh
+# Uso: greeter-deploy                 (solo actualiza el QML)
+#      greeter-deploy /ruta/foto.png  (actualiza QML y cambia el fondo)
+DST=/etc/greetd/quickshell
+sudo install -m 644 "$HOME/.config/greeter/shell.qml" "$DST/shell.qml"
+[ -n "$1" ] && sudo install -m 644 "$1" "$DST/wallpaper"
+echo "Desplegado en $DST"

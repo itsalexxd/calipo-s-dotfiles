@@ -1,0 +1,77 @@
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
+import Quickshell.Services.Pam
+
+Scope {
+    id: root
+    property string typed: ""
+    property bool failed: false
+
+    IpcHandler {
+        target: "lock"
+        function lock(): void { sessionLock.locked = true }
+    }
+
+    SystemClock { id: clock; precision: SystemClock.Seconds }
+
+    PamContext {
+        id: pam
+        config: "login"
+        onResponseRequiredChanged: if (responseRequired) respond(root.typed)
+        onCompleted: result => {
+            if (result === PamResult.Success) {
+                root.typed = ""
+                sessionLock.locked = false
+            } else {
+                root.failed = true
+                root.typed = ""
+            }
+        }
+    }
+
+    WlSessionLock {
+        id: sessionLock
+
+        WlSessionLockSurface {
+            color: "#1e1e2e"
+
+            Item {
+                anchors.fill: parent
+                focus: true
+
+                Keys.onPressed: event => {
+                    if (pam.active) return
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        pam.start()
+                    } else if (event.key === Qt.Key_Backspace) {
+                        root.typed = root.typed.slice(0, -1)
+                    } else if (event.text.length > 0 && event.key !== Qt.Key_Escape) {
+                        root.failed = false
+                        root.typed += event.text
+                    }
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 20
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: Qt.formatTime(clock.date, "hh:mm")
+                        color: "#cdd6f4"
+                        font.pixelSize: 96
+                    }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.failed ? "Contraseña incorrecta"
+                                          : "●".repeat(root.typed.length)
+                        color: root.failed ? "#f38ba8" : "#cdd6f4"
+                        font.pixelSize: 28
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+  // Logo: una imagen aleatoria de ~/02_Imagenes/Stickers.
+  // El patrón es un glob nativo: fastfetch elige al azar entre todas las
+  // coincidencias y el nombre completo se trata como un patrón, así que los
+  // nombres de archivo con espacios también funcionan.
+  // [jpwgJPWG] = primera letra de la extensión (jpg, jpeg, png, webp, gif)
+  // [gpfGPF]   = última letra de la extensión (jpg/g, png/g, webp/p, gif/f)
+  // Las dos clases son necesarias: con una sola, el glob también capturaba
+  // archivos que no son imágenes (.json, .jsonc, .pdf...) y fastfetch fallaba
+  // al intentar cargarlos, volviendo al logo ASCII de Arch.
+  "logo": {
+    "type": "kitty",
+    "source": "~/02_Imagenes/Stickers/*.[jpwgJPWG]*[gpfGPF]",
+    "width": 18
+  },
+  "modules": [
+    "title",
+    "separator",
+    "os",
+    "host",
+    "shell",
+    "font",
+    "terminal",
+    "terminalfont",
+    "cpu",
+    "gpu",
+    "memory",
+    "disk",
+    "battery",
+    "break",
+    "colors"
+  ]
+}

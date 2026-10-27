@@ -1,0 +1,29 @@
+#!/bin/sh
+# Historial de portapapeles (cliphist) en un popup wofi.
+# Atajo: Super + Shift + V
+
+STYLE="$HOME/.config/quickshell/clipboard/wofi.css"
+LIST=$(cliphist list)
+
+if [ -z "$LIST" ]; then
+    notify-send "Portapapeles" "El historial está vacío" 2>/dev/null || true
+    exit 0
+fi
+
+SELECTED=$(printf '%s\n' "$LIST" | wofi --dmenu \
+    --prompt "Portapapeles" \
+    --width 720 --height 480 \
+    --cache-file /dev/null \
+    --insensitive \
+    --style "$STYLE")
+
+[ -n "$SELECTED" ] || exit 0
+
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+printf '%s\n' "$SELECTED" | cliphist decode > "$TMP" || exit 1
+MIME=$(file --brief --mime-type "$TMP" 2>/dev/null || echo "text/plain")
+case "$MIME" in
+    image/*) wl-copy --type "$MIME" < "$TMP" ;;
+    *)       wl-copy < "$TMP" ;;
+esac
