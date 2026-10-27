@@ -369,17 +369,17 @@ hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- Historial de portapapeles en un popup (nuevo atajo, no reemplaza nada).
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("/home/alexg/.local/bin/clipboard-history"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ action = "toggle" }))
-hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs ipc -p /home/alexg/.config/quickshell/launcher/shell.qml call launcher toggle"))
+hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("qs -p /home/alexg/.config/quickshell/shell.qml ipc call launcher toggle"))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit")) -- dwindle only
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("brave"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("btop"))
 hl.bind(
 	mainMod .. " + W",
-	hl.dsp.exec_cmd("qs ipc -p /home/alexg/.config/quickshell/wallpaper/shell.qml call wallpaper toggle")
+	hl.dsp.exec_cmd("qs -p /home/alexg/.config/quickshell/shell.qml ipc call wallpaper toggle")
 )
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("hyprshot -m region"))
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("qs ipc -p /home/alexg/.config/quickshell/lock/shell.qml call lock lock"))
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("qs -p /home/alexg/.config/quickshell/shell.qml ipc call lock lock"))
 
 -- Cambiar el idioma del teclado entre espanol (es) e ingles (us)
 -- (ver input.kb_layout = "es,us" mas arriba)
